@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { sendQueryAction } from '../store/documentSlice';
-import { Send, User, Bot, AlertCircle, Loader2 } from 'lucide-react';
+import { sendQueryAction, summarizeDocumentAction, clearError } from '../store/documentSlice';
+import { Send, User, Bot, AlertCircle, FileSearch, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import ReactMarkdown from 'react-markdown';
@@ -9,114 +9,192 @@ import ReactMarkdown from 'react-markdown';
 const ChatInterface = () => {
     const [inputStr, setInputStr] = useState('');
     const dispatch = useDispatch();
-    const { messages, isQuerying, queryError } = useSelector((state) => state.document);
+    const { messages, isQuerying, queryError, isSummarizing, summaryError, currentDocument, chunksEmbedded } = useSelector((state) => state.document);
     const bottomRef = useRef(null);
+    const textareaRef = useRef(null);
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, isQuerying]);
+    }, [messages, isQuerying, isSummarizing]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (!inputStr.trim() || isQuerying) return;
+        if (!inputStr.trim() || isQuerying || isSummarizing) return;
 
         // Optimistic UI update
         dispatch({ type: 'document/addMessage', payload: { role: 'user', content: inputStr } });
-
-        // Send to backend
         dispatch(sendQueryAction(inputStr));
         setInputStr('');
+
+        // Reset textarea height
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+        }
     };
 
-    const hasMessages = messages.length > 0;
+    const handleSummarize = () => {
+        if (!currentDocument || isSummarizing || isQuerying) return;
+        dispatch({ type: 'document/addMessage', payload: { role: 'user', content: '📋 Generate an executive summary of this document.' } });
+        dispatch(summarizeDocumentAction(currentDocument));
+    };
 
-    if (!hasMessages) return null;
+    const handleTextareaChange = (e) => {
+        setInputStr(e.target.value);
+        // Auto-resize
+        e.target.style.height = 'auto';
+        e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
+    };
+
+    const isProcessing = isQuerying || isSummarizing;
+    const error = queryError || summaryError;
 
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col flex-1 mt-8 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden"
+            className="flex flex-col flex-1 mt-6 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden glow-card"
         >
-            <div className="bg-surface-50 px-6 py-4 border-b border-gray-200 sticky top-0 z-10">
-                <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                    <Bot size={20} className="text-primary-600" /> Document Insights
-                </h3>
-                <p className="text-sm text-gray-500">Ask questions based on the uploaded contents.</p>
+            {/* Chat Header */}
+            <div className="bg-gradient-to-r from-slate-50 to-indigo-50/30 px-6 py-4 border-b border-slate-100 sticky top-0 z-10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-md">
+                        <Bot size={18} className="text-white" />
+                    </div>
+                    <div>
+                        <h3 className="text-sm font-bold text-slate-800 leading-none">Document Assistant</h3>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                            {chunksEmbedded ? `${chunksEmbedded} chunks · ` : ''}{currentDocument}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Summarize button */}
+                <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleSummarize}
+                    disabled={isProcessing}
+                    className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-violet-600 text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-md hover:shadow-lg transition-shadow disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                    <Sparkles size={14} className="fill-white" />
+                    Summarize Document
+                </motion.button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-white min-h-[400px] max-h-[600px] scrollbar-thin">
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-5 min-h-[400px] max-h-[560px]">
                 {messages.map((msg, idx) => (
                     <motion.div
                         key={idx}
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.25 }}
                         className={clsx(
-                            "flex gap-4 max-w-[85%]",
+                            "flex gap-3 max-w-[88%]",
                             msg.role === 'user' ? "ml-auto flex-row-reverse" : "mr-auto"
                         )}
                     >
+                        {/* Avatar */}
                         <div className={clsx(
-                            "flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-white",
-                            msg.role === 'user' ? "bg-surface-800 shadow-sm" : "bg-primary-600 shadow-md"
+                            "flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-sm",
+                            msg.role === 'user'
+                                ? "bg-slate-700"
+                                : msg.type === 'summary'
+                                    ? "bg-gradient-to-br from-violet-500 to-purple-600"
+                                    : "bg-gradient-to-br from-indigo-500 to-violet-600"
                         )}>
-                            {msg.role === 'user' ? <User size={20} /> : <Bot size={20} />}
+                            {msg.role === 'user' ? <User size={16} /> : <Bot size={16} />}
                         </div>
 
+                        {/* Bubble */}
                         <div className={clsx(
-                            "rounded-2xl px-6 py-4 shadow-sm",
-                            msg.role === 'user' ? "bg-surface-100 text-surface-900 rounded-tr-sm" : "bg-primary-50 text-surface-900 rounded-tl-sm border border-primary-100"
+                            "rounded-2xl px-5 py-4 shadow-sm text-sm",
+                            msg.role === 'user'
+                                ? "bg-slate-100 text-slate-800 rounded-tr-sm"
+                                : msg.type === 'summary'
+                                    ? "bg-gradient-to-br from-violet-50 to-purple-50 border border-violet-100 text-slate-800 rounded-tl-sm"
+                                    : "bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 text-slate-800 rounded-tl-sm"
                         )}>
-                            <div className="prose prose-sm prose-primary max-w-none">
+                            {msg.type === 'summary' && (
+                                <div className="flex items-center gap-1.5 text-violet-600 font-bold text-xs uppercase tracking-wider mb-3 pb-2 border-b border-violet-100">
+                                    <FileSearch size={13} />
+                                    AI-Generated Summary
+                                </div>
+                            )}
+
+                            <div className="prose prose-sm prose-slate max-w-none leading-relaxed">
                                 <ReactMarkdown>{msg.content}</ReactMarkdown>
                             </div>
 
+                            {/* Sources */}
                             {msg.sources && msg.sources.length > 0 && msg.sources[0] !== 'Unknown' && (
-                                <div className="mt-4 pt-3 border-t border-primary-200/60">
-                                    <p className="text-xs font-semibold text-primary-700 tracking-wide uppercase mb-1">Sources</p>
-                                    <ul className="text-xs text-primary-600/80 list-disc list-inside">
+                                <div className="mt-3 pt-3 border-t border-indigo-100">
+                                    <p className="text-xs font-bold text-indigo-500 uppercase tracking-wider mb-1.5">Sources</p>
+                                    <div className="flex flex-wrap gap-1.5">
                                         {msg.sources.map((src, i) => (
-                                            <li key={i}>{src}</li>
+                                            <span key={i} className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
+                                                {src}
+                                            </span>
                                         ))}
-                                    </ul>
+                                    </div>
                                 </div>
                             )}
                         </div>
                     </motion.div>
                 ))}
 
-                {isQuerying && (
+                {/* Typing indicator */}
+                {isProcessing && (
                     <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="flex gap-4 max-w-[85%] mr-auto"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex gap-3 max-w-[88%] mr-auto"
                     >
-                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary-600 shadow-md flex items-center justify-center text-white">
-                            <Bot size={20} />
+                        <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white shadow-sm">
+                            <Bot size={16} />
                         </div>
-                        <div className="px-6 py-5 rounded-2xl bg-primary-50 text-surface-900 rounded-tl-sm border border-primary-100 flex items-center shadow-sm">
-                            <Loader2 size={24} className="animate-spin text-primary-600" />
-                            <span className="ml-3 font-medium text-primary-700">Analyzing document context...</span>
+                        <div className="bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm flex items-center gap-3">
+                            <div className="flex gap-1 text-indigo-400">
+                                <div className="typing-dot"></div>
+                                <div className="typing-dot"></div>
+                                <div className="typing-dot"></div>
+                            </div>
+                            <span className="text-xs text-indigo-500 font-medium">
+                                {isSummarizing ? 'Generating summary with Gemini...' : 'Analyzing document context...'}
+                            </span>
                         </div>
                     </motion.div>
                 )}
 
-                {queryError && (
-                    <div className="flex items-center gap-3 bg-red-50 text-red-700 p-4 rounded-xl border border-red-200 max-w-[85%] mr-auto">
-                        <AlertCircle size={20} className="text-red-500 flex-shrink-0" />
-                        <p className="text-sm font-medium">{queryError}</p>
-                    </div>
-                )}
+                {/* Error */}
+                <AnimatePresence>
+                    {error && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="flex items-start gap-3 bg-red-50 text-red-700 p-4 rounded-xl border border-red-200 max-w-[88%] mr-auto"
+                        >
+                            <AlertCircle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
+                            <div>
+                                <p className="text-xs font-bold uppercase tracking-wide text-red-500 mb-0.5">Error</p>
+                                <p className="text-sm font-medium">{error}</p>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
                 <div ref={bottomRef} />
             </div>
 
-            <div className="p-4 bg-white border-t border-gray-100">
-                <form onSubmit={handleSubmit} className="relative max-w-4xl mx-auto flex items-end gap-2">
-                    <div className="relative flex-1 rounded-2xl border border-gray-300 shadow-sm focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-primary-500 bg-white transition-all overflow-hidden text-left flex items-center pr-12 pb-1">
+            {/* Input area */}
+            <div className="p-4 bg-white border-t border-slate-100">
+                <form onSubmit={handleSubmit} className="relative max-w-4xl mx-auto">
+                    <div className="gradient-border relative rounded-2xl border border-slate-200 shadow-sm bg-white overflow-hidden transition-all focus-within:shadow-md focus-within:border-indigo-300">
                         <textarea
+                            ref={textareaRef}
                             value={inputStr}
-                            onChange={(e) => setInputStr(e.target.value)}
+                            onChange={handleTextareaChange}
                             placeholder="Ask a question about the document..."
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -125,21 +203,24 @@ const ChatInterface = () => {
                                 }
                             }}
                             rows={1}
-                            className="resize-none appearance-none bg-transparent flex-1 py-4 pl-5 m-0 placeholder-gray-400 font-medium text-gray-800 focus:outline-none scrollbar-hide min-h-[56px] w-full"
+                            disabled={isProcessing}
+                            className="block w-full resize-none bg-transparent py-4 pl-5 pr-16 text-sm text-slate-800 placeholder-slate-400 font-medium focus:outline-none min-h-[56px] max-h-[200px] leading-relaxed disabled:opacity-70"
                         />
+
+                        <button
+                            type="submit"
+                            disabled={!inputStr.trim() || isProcessing}
+                            className="absolute right-2 bottom-2 w-10 h-10 bg-gradient-to-br from-indigo-500 to-violet-600 text-white rounded-xl flex items-center justify-center shadow-md hover:shadow-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105 active:scale-95"
+                            aria-label="Send message"
+                        >
+                            <Send size={16} className="translate-x-[1px]" />
+                        </button>
                     </div>
-                    <button
-                        type="submit"
-                        disabled={!inputStr.trim() || isQuerying}
-                        className="flex-shrink-0 bg-primary-600 hover:bg-primary-700 text-white rounded-xl p-4 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm absolute right-1.5 bottom-1.5"
-                        aria-label="Send Message"
-                    >
-                        <Send size={20} />
-                    </button>
+
+                    <p className="text-center mt-2.5 text-xs text-slate-400">
+                        Press <kbd className="px-1.5 py-0.5 bg-slate-100 rounded text-slate-500 font-mono text-[10px]">Enter</kbd> to send · <kbd className="px-1.5 py-0.5 bg-slate-100 rounded text-slate-500 font-mono text-[10px]">Shift+Enter</kbd> for new line
+                    </p>
                 </form>
-                <div className="text-center mt-3 text-xs text-gray-400 font-medium">
-                    Smart Insights AI may produce inaccurate insights about complex documents. Verify critical information.
-                </div>
             </div>
         </motion.div>
     );

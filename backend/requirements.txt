@@ -4,8 +4,9 @@ python-multipart
 # AI Pipeline
 langchain
 langchain-core
-langchain-openai
+langchain-google-genai
 langchain-community
+langchain-text-splitters
 # Vector Database
 chromadb
 # Document Loaders & extraction

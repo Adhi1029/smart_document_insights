@@ -13,3 +13,4 @@ backend/venv/
 backend/.env
 backend/chroma_db/
 *.pyc
+node_modules/

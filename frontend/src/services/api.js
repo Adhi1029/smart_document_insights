@@ -2,7 +2,10 @@ import axios from 'axios';
 
 // Create an Axios instance pointing to the FastAPI backend
 const api = axios.create({
-    baseURL: 'http://localhost:8000',
+    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+    headers: {
+        'Content-Type': 'application/json',
+    },
 });
 
 export const uploadDocument = async (file) => {
@@ -17,6 +20,11 @@ export const uploadDocument = async (file) => {
 
 export const queryDocument = async (query) => {
     const response = await api.post('/query', { query });
+    return response.data;
+};
+
+export const summarizeDocument = async (sourceName) => {
+    const response = await api.post(`/summarize?source_name=${encodeURIComponent(sourceName)}`);
     return response.data;
 };
 
