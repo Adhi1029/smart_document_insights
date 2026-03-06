@@ -138,7 +138,7 @@ const ChatInterface = () => {
                     </button>
                 </form>
                 <div className="text-center mt-3 text-xs text-gray-400 font-medium">
-                    Antigravity AI may produce inaccurate insights about complex documents. Verify critical information.
+                    Smart Insights AI may produce inaccurate insights about complex documents. Verify critical information.
                 </div>
             </div>
         </motion.div>

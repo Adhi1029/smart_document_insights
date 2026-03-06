@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="Antigravity Document Insights API",
+    title="Smart Document Insights API",
     description="Backend API for document ingestion and RAG-based natural language querying.",
     version="1.0.0"
 )
@@ -29,7 +29,7 @@ class QueryRequest(BaseModel):
 
 @app.get("/")
 def read_root():
-    return {"status": "ok", "message": "Antigravity Pipeline is Running."}
+    return {"status": "ok", "message": "Smart Insights Pipeline is Running."}
 
 @app.post("/upload")
 async def upload_document(file: UploadFile = File(...)):

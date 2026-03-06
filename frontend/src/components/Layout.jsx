@@ -11,8 +11,7 @@ const Layout = ({ children }) => {
                             <div className="bg-primary-600 p-2 rounded-lg text-white">
                                 <BookOpen size={24} />
                             </div>
-                            <h1 className="text-xl font-bold text-surface-900 tracking-tight">Antigravity</h1>
-                            <span className="text-sm font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full ml-2">Smart Insights</span>
+                            <h1 className="text-xl font-bold text-surface-900 tracking-tight">Smart Insights</h1>
                         </div>
                     </div>
                 </div>
