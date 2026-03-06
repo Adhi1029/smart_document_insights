@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+python-multipart
+# AI Pipeline
+langchain
+langchain-core
+langchain-openai
+langchain-community
+# Vector Database
+chromadb
+# Document Loaders & extraction
+pypdf
+python-docx
+python-dotenv
